@@ -7,18 +7,34 @@ from tempfile import NamedTemporaryFile
 from subprocess import call
 from sys import exit
 from discord_webhook import DiscordWebhook
+from os import remove
 
+# Update this every semester!
 dutiesPath = "/Shared/NewDrive/ALPHA SIG GENERAL/02_COMMITTEES/07_HOUSING/WEEKLY DUTIES/2023_SPRING/"
 
+# Grab the password and nextcloud URL from files.
 with open("/opt/bots/password", "r") as passwordFile:
     password = passwordFile.readline().strip()
 
 with open("/opt/bots/DutySheetScreenshot/URLs/nextcloudURL.txt", "r") as URLFile:
     ncURL = URLFile.readline().strip()
 
+with open("/opt/bots/DutySheetScreenshot/URLs/dutySheetDiscordURL.txt", "r") as discordURLFile:
+    discordURL = discordURLFile.readline().strip()
+
+
+def lastSubstringAfter(s: str, delimiter: str):
+    i = s.rfind(delimiter)
+    return s[i + 1:] if i != -1 else s
+
+
+str.lastSubstringAfter = lastSubstringAfter
+
+# The NextCloud API requires the filepaths to be URL encoded.
 dutiesPath = urlencode(dutiesPath)
 
 # See https://docs.nextcloud.com/server/19/developer_manual/client_apis/WebDAV/basic.html for info on the NC API.
+# Request a list of all the files in the duty sheet folder with all of their file IDs.
 dutiesResponse = requests.request(
     method="PROPFIND",
     url=ncURL + "remote.php/dav/files/bot" + dutiesPath,
@@ -32,6 +48,7 @@ dutiesResponse = requests.request(
 )
 response = dutiesResponse.text
 responseXML = ET.fromstring(response)
+# Pull out the file IDs from the response and associate them with their matching file name.
 fileIDs = {}
 files = responseXML.findall("{DAV:}response")
 for file in files:
@@ -54,28 +71,23 @@ with open("/opt/bots/DutySheetScreenshot/lastFileID", "w+") as lastIDFile:
 
     lastIDFile.write(fileID)
 
-xlsxFile = NamedTemporaryFile()
-pdfFile = xlsxFile.name + ".pdf"
+docxFile = NamedTemporaryFile()
+pdfFile = docxFile.name + ".pdf"
 pngFile = NamedTemporaryFile()
+# Grab the actual file and write it to a temp file
 content = requests.get(
     url=ncURL + "remote.php/dav/files/bot" + newestDutySheet,
     auth=("bot", password)
 ).content
-xlsxFile.write(content)
-
-call("libreoffice --headless --convert-to pdf {} --outdir /tmp".format(xlsxFile.name), shell=True)
-xlsxFile.close()
+docxFile.write(content)
+# Convert the docx to a PDF
+call("libreoffice --headless --convert-to pdf {} --outdir /tmp".format(docxFile.name), shell=True)
+docxFile.close()
+# Convert the PDF to a PNG
 call("pdftoppm {} -png > {}".format(pdfFile, pngFile.name), shell=True)
 
-with open("/opt/bots/DutySheetScreenshot/URLs/dutySheetDiscordURL.txt", "r") as discordURLFile:
-    discordURL = discordURLFile.readline().strip()
-
-
-def lastSubstringAfter(s: str):
-    i = s.rfind("/")
-    return s[i + 1:] if i != -1 else s
-
-
+# Send a message in #house-announcements with the duty sheet attached as an image, and a link to the docx.
 webhook = DiscordWebhook(url=discordURL, content="**This week's Duty Sheet:** {}f/{}".format(ncURL, fileID))
-webhook.add_file(pngFile.read(), filename=lastSubstringAfter(newestDutySheet)[:-4] + ".png")
+webhook.add_file(pngFile.read(), filename=lastSubstringAfter(newestDutySheet, "/")[:-4] + ".png")
 webhook.execute()
+remove(pdfFile)  # The other temp files will be removed automatically, but not this one.
