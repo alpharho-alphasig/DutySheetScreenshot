@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from urllib.parse import quote as urlencode
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree
 import requests
 from tempfile import NamedTemporaryFile
 from subprocess import call
@@ -12,15 +12,10 @@ from os import remove
 # Update this every semester!
 dutiesPath = "/Shared/NewDrive/ALPHA SIG GENERAL/02_COMMITTEES/07_HOUSING/WEEKLY DUTIES/2023_SPRING/"
 
-# Grab the password and nextcloud URL from files.
-with open("/opt/bots/password", "r") as passwordFile:
-    password = passwordFile.readline().strip()
 
-with open("/opt/bots/DutySheetScreenshot/URLs/nextcloudURL.txt", "r") as URLFile:
-    ncURL = URLFile.readline().strip()
-
-with open("/opt/bots/DutySheetScreenshot/URLs/dutySheetDiscordURL.txt", "r") as discordURLFile:
-    discordURL = discordURLFile.readline().strip()
+def readFile(path):
+    with open(path, "r") as f:
+        return f.readline().strip()
 
 
 def lastSubstringAfter(s: str, delimiter: str):
@@ -28,7 +23,10 @@ def lastSubstringAfter(s: str, delimiter: str):
     return s[i + 1:] if i != -1 else s
 
 
-str.lastSubstringAfter = lastSubstringAfter
+# Grab the password and nextcloud URL from files.
+password = readFile("/opt/bots/password")
+ncURL = readFile("/opt/bots/DutySheetScreenshot/URLs/nextcloudURL.txt")
+discordURL = readFile("/opt/bots/DutySheetScreenshot/URLs/dutySheetDiscordURL.txt")
 
 # The NextCloud API requires the filepaths to be URL encoded.
 dutiesPath = urlencode(dutiesPath)
@@ -47,17 +45,19 @@ dutiesResponse = requests.request(
   </d:propfind>"""
 )
 response = dutiesResponse.text
-responseXML = ET.fromstring(response)
+responseXML = ElementTree.fromstring(response)
 # Pull out the file IDs from the response and associate them with their matching file name.
 fileIDs = {}
 files = responseXML.findall("{DAV:}response")
 for file in files:
-    path = file.find("{DAV:}href").text
+    fileID = None
+    filePath = file.find("{DAV:}href").text
     for child in file.find("{DAV:}propstat").iter():
         if child.tag.endswith("fileid"):
             fileID = child.text
             break
-    fileIDs[fileID] = path[25:]
+    if fileID is not None:
+        fileIDs[fileID] = filePath[25:]
 
 fileID = max(fileIDs.keys())
 newestDutySheet = fileIDs[fileID]
