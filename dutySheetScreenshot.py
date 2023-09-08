@@ -10,7 +10,7 @@ from discord_webhook import DiscordWebhook
 from os import remove
 
 # Update this every semester!
-dutiesPath = "/Shared/NewDrive/ALPHA SIG GENERAL/02_COMMITTEES/07_HOUSING/WEEKLY DUTIES/2023_SPRING/"
+dutiesPath = "/Shared/NewDrive/ALPHA SIG GENERAL/02_COMMITTEES/07_HOUSING/WEEKLY DUTIES/2023_FALL/"
 
 
 def readFile(path):
