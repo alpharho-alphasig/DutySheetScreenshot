@@ -6,11 +6,14 @@ import requests
 from tempfile import NamedTemporaryFile
 from subprocess import call
 from sys import exit
+import json
 from discord_webhook import DiscordWebhook
 from os import remove
 
-# Update this every semester!
-dutiesPath = "/Shared/NewDrive/ALPHA SIG GENERAL/02_COMMITTEES/07_HOUSING/WEEKLY DUTIES/2024_FALL/"
+with open("/opt/bots/config.json", "r") as configFile:
+    config = json.load(configFile)
+
+dutiesPath = config["weeklyDutiesPath"] + config["currentSemester"]["year"] + "_" + config["currentSemester"]["season"]
 
 
 def readFile(path):
@@ -24,9 +27,9 @@ def lastSubstringAfter(s: str, delimiter: str):
 
 
 # Grab the password and nextcloud URL from files.
-password = readFile("/opt/bots/password")
-ncURL = readFile("/opt/bots/DutySheetScreenshot/URLs/nextcloudURL.txt")
-discordURL = readFile("/opt/bots/DutySheetScreenshot/URLs/dutySheetDiscordURL.txt")
+password = config["botPassword"]
+ncURL = config["nextcloudURL"]
+discordURL = config["dutySheetDiscordURL"]
 
 # The NextCloud API requires the filepaths to be URL encoded.
 dutiesPath = urlencode(dutiesPath)
